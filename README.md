@@ -1,187 +1,171 @@
-# Cirkitly: Your AI-Powered C Test Copilot
+# Spec2RTL: AI-Powered Hardware Design & Verification Copilot
 
-Welcome to Cirkitly! This is an AI assistant that collaborates with you to write robust unit tests for your C code. Instead of just generating code, Cirkitly first proposes a detailed test plan for your approval, ensuring you are always in control.
+Spec2RTL is an autonomous AI assistant that transforms high-level hardware specifications into verified, ready-to-use Verilog RTL and a corresponding SystemVerilog testbench. It leverages a multi-agent workflow, a self-correction loop, and a custom knowledge base to automate the most tedious parts of the hardware design lifecycle.
 
-![Cirkitly Demo](assets/demo.gif)
+This isn't just a code generator; it's a collaborative partner that plans, generates, validates, critiques, and refines its own work, presenting a polished result for final human approval.
 
-### The New Workflow (The Magic)
+<!-- ![Spec2RTL Demo](assets/demo.gif) -->
 
-Cirkitly acts as your partner, following a professional test development process:
+## Key Features
 
-1.  **Scans Your Project:** It finds all your `.c` and `.h` source files.
-2.  **Proposes a Test Plan:** After you select a file, the AI analyzes the source code and any relevant specifications. It then presents you with a detailed, human-readable test plan, outlining every test case it intends to write.
-3.  **Gets Your Approval:** You review the plan. If it's correct and complete, you give the green light. This ensures the AI builds exactly what you want.
-4.  **Writes the Test Code:** The AI now writes a complete `test_*.c` file that precisely implements the approved plan, covering success paths, error handling, and edge cases.
-5.  **Creates a Build File:** It also generates a `Makefile.test` so you can immediately compile and run your new tests.
-
----
-
-### Requirements
-
-1.  **Python:** You'll need Python 3.10 or newer.
-2.  **A C Compiler:** A `gcc` compatible compiler is needed to run the generated tests.
-3.  **An AI Backend:** You need access to an AI model, either locally via Ollama or through the cloud via Azure OpenAI.
+*   **Specification-Driven Design:** Takes a natural language markdown file as the single source of truth.
+*   **Knowledge-Aware Generation (RAG):** Utilizes a custom knowledge base (e.g., for simulator-specific rules or project coding standards) to generate more accurate and compliant code.
+*   **Autonomous Workflow:**
+    *   **AI-Powered Planning:** First, it creates a high-level plan for how it will tackle the generation tasks.
+    *   **Parallel Code Generation:** Generates RTL and testbench code concurrently for maximum speed.
+*   **Self-Correction Loop:**
+    *   **Automated Validation:** Uses `iverilog` to instantly check the generated code for syntax errors.
+    *   **AI Self-Critique:** An AI agent acts as a peer reviewer, checking the code for logical flaws, coverage gaps, and inconsistencies.
+    *   **Recursive Debugging:** If any errors are found (either by the compiler or the AI critique), the system automatically attempts to fix them and re-validates, looping until the code is correct.
+*   **Human-in-the-Loop:** You are the final authority. The AI presents the validated, verified code for your approval before any files are written.
 
 ---
 
-### Step-by-Step Installation & Configuration
+## How It Works
 
-#### Step 1: Get the Cirkitly Code
+Spec2RTL orchestrates a sophisticated multi-agent workflow:
 
-```bash
-# Clone the repository from GitHub
-git clone https://github.com/Cirkitly/x-hardware-design
+```mermaid
+flowchart TD
+    subgraph "Phase 1: Planning"
+        A[Select Spec] --> B(Retrieve Knowledge via RAG)
+        B --> C(AI Creates a Plan)
+    end
+    
+    subgraph "Phase 2: Generation"
+        C --> D(Generate RTL & Testbench in Parallel)
+    end
 
-# Navigate into the project directory
-cd x-hardware-design
+    subgraph "Phase 3: Autonomous Verification"
+        D --> E{Compile Code}
+        E -- Syntax OK --> F{AI Code Review}
+        E -- Syntax Error --> G{Self-Correction AI}
+        F -- Logical Issue --> G
+        G --> E
+    end
+    
+    subgraph "Phase 4: Finalization"
+        F -- No Issues --> H(Human Approval)
+        H -- Approve --> I(Write Files & Sim Script)
+        I --> Z[Done]
+        H -- Reject --> Z
+    end
 ```
 
-#### Step 2: Install Python Packages
+---
+
+## Getting Started
+
+### Prerequisites
+
+1.  **Python:** 3.10 or newer.
+2.  **A C Compiler:** `gcc` is required for one of the dependencies.
+3.  **Icarus Verilog:** The tool used for code validation.
+    *   On Ubuntu/Debian: `sudo apt-get install iverilog`
+    *   On macOS (with Homebrew): `brew install icarus-verilog`
+4.  **An AI Backend:** You need access to an AI model, either locally via **Ollama** or through the cloud via **Azure OpenAI**.
+
+### 1. Clone the Repository
 
 ```bash
+git clone https://github.com/cirkitly/spec2rtl.git
+cd spec2rtl
+```
+
+### 2. Set Up Your Environment
+
+It's highly recommended to use a virtual environment.
+
+```bash
+# Create a virtual environment
+python3 -m venv env
+
+# Activate it
+source env/bin/activate
+
 # Install all required Python packages
 pip install -r requirements.txt
 ```
 
-#### Step 3: Configure the AI Backend
+### 3. Configure the AI Backend
 
-Cirkitly needs API keys and endpoint information to communicate with an AI. This is stored in a `.env` file. First, copy the example file:
+The application uses a `.env` file to manage API keys and endpoints. First, create your own `.env` file by copying the example:
 
 ```bash
 cp .env.example .env
 ```
 
-Now, open the new `.env` file and fill it out according to **one** of the options below.
+Next, open the new `.env` file and fill it out according to **one** of the options below.
 
 ---
 
-##### **Option A: Azure OpenAI (Recommended for Speed & Power)**
+#### **Option A: Azure OpenAI (Recommended)**
 
-Edit your `.env` file to look like this, replacing the placeholder values with your actual Azure credentials.
+Edit your `.env` file to look like this, replacing the placeholders with your actual Azure credentials.
 
 ```dotenv
 # .env file for Azure
+LLM_PROVIDER="azure"
 
 AZURE_OPENAI_ENDPOINT=https://<your-resource-name>.openai.azure.com/
 AZURE_OPENAI_API_KEY=<your-azure-openai-key>
 AZURE_OPENAI_DEPLOYMENT=<your-deployment-name>
 AZURE_OPENAI_API_VERSION=2024-05-01-preview
-
-# The DEPLOYMENT name is not the model name (e.g., gpt-4), 
-# but the custom name you gave the model when you deployed it in Azure.
-
-LOG_DIR=logs
 ```
+*Note: `AZURE_OPENAI_DEPLOYMENT` is the custom name you gave the model when you deployed it in Azure.*
 
 ---
 
-##### **Option B: Ollama (Free, Private, and Local)**
+#### **Option B: Ollama (Local & Private)**
 
-If you prefer to run models locally, first download and run [Ollama](https://ollama.com/). Then, pull the required models:
+If you prefer to run models locally, first download and run [Ollama](https://ollama.com/). Then, pull the required models from your terminal:
 
 ```bash
 # 1. Download the main language model (for writing code)
 ollama pull llama3
 
-# 2. Download the embedding model (for understanding text)
+# 2. Download the embedding model (for RAG)
 ollama pull mxbai-embed-large
 ```
 
-The default `.env.example` is already set up for Ollama, so you don't need to make any changes to your `.env` file.
+The `.env.example` is already set up for Ollama, so you just need to ensure `LLM_PROVIDER="ollama"` is set in your `.env` file.
 
 ---
 
-### How to Use It (The Fun Part!)
+## How to Use Spec2RTL
 
-#### Step 1: Prepare Your C Project
+#### Step 1: Add Your Specifications
 
-Cirkitly works with standard C project layouts. The included `my_c_project` is a great starting point.
+Place your hardware module specifications as `.md` files inside the `specs/` directory. A `uart_spec.md` is included as an example.
 
-```
-my_c_project/
-├── include/
-│   └── spi.h       <-- Your header files
-└── src/
-    └── spi.c       <-- Your source code
-```
+#### Step 2: (Optional) Add to the Knowledge Base
 
-#### Step 2: Run Cirkitly
+Place any relevant documentation, coding standards, or compatibility rules as `.txt` files in the `knowledge_source/` directory. The AI will use this information to generate better, more compliant code.
 
-From the main `cirkitly` directory, run the program:
+#### Step 3: Run the Copilot!
+
+From the project's root directory, run the main script:
 
 ```bash
-python main.py
+python3 main.py
 ```
 
-#### Step 3: Follow the Prompts
+#### Step 4: Collaborate with the AI
 
-1.  `Enter the path to the C project:`
-    *   Press Enter to accept the default (`my_c_project`).
+1.  **Select a Spec:** The tool will list all specifications it found. Enter the number corresponding to the one you want to work on.
+2.  **Watch it Work:** The AI will create a plan, generate the code, and run its validation and self-critique loops. You will see status updates in real-time.
+3.  **Approve the Result:** Once the AI is satisfied with its work, it will present the final Verilog RTL and SystemVerilog testbench for your review. If you approve, it will save the files.
 
-2.  `Which file would you like to generate tests for?`
-    *   It will show you a numbered list. Type the number for `spi.c` and press Enter.
+#### Step 5: Run Your New Simulation
 
-#### Step 4: Approve the Test Plan
-
-Cirkitly will now present you with a detailed Markdown plan. Review the proposed test cases. If you're happy with the plan, approve it to proceed.
-
-```text
-Does this test plan look correct? Shall I proceed with generating the code? [y/n] (y): y
-```
-
-#### Step 5: Get the Results!
-
-The AI will generate the code and tell you when it's done.
-
-```
-==================================================
-Cirkitly Task Complete!
-  - Tests written to my_c_project/src/test_spi.c
-  - Makefile generated at my_c_project/Makefile.test
-==================================================
-```
-
----
-
-### How to Run Your New Tests
-
-You've generated the tests, now let's run them!
-
-#### Step 1: Get the Unity Testing Framework
-
-The generated tests use **Unity**, a popular C testing framework. You only need to do this once per C project.
+The generated files will be placed in a new directory inside `output/`.
 
 ```bash
-# Navigate into your C project
-cd my_c_project
+# Navigate to the output directory
+cd output/uart_spec
 
-# Clone the Unity framework from GitHub into a folder named "unity"
-git clone https://github.com/ThrowTheSwitch/Unity.git unity
+# Run the simulation script
+./run_sim.sh
 ```
 
-#### Step 2: Compile and Run!
-
-The `Makefile.test` that Cirkitly created does all the hard work.
-
-```bash
-make -f Makefile.test run
-```
-
-You should see the tests compile and run, ending with a message like this:
-
-```
------------------------
-17 Tests 0 Failures 0 Ignored
-OK
-```
-
-**Congratulations! You've successfully used an AI copilot to write and run tests for your C code!**
-
----
-
-### Troubleshooting
-
-*   **API / Network Errors (Azure):** If the program hangs or shows a timeout error, double-check your `.env` file for typos in the endpoint and API key. Also, ensure your network firewall allows outbound connections to `*.openai.azure.com`.
-*   **Connection Errors (Ollama):** Make sure the Ollama application is running on your computer before starting Cirkitly.
-*   **`File not found`:** Make sure you typed the correct path to your project folder (e.g., `my_c_project`).
-*   **C Compilation Errors:** While the new workflow makes this much less likely, the AI can still occasionally make a small mistake. If `make` fails, the C compiler error message will usually point to the exact line in `test_spi.c` that needs a minor fix.
+You should see the `iverilog` compilation and the testbench execution results printed to your console. Congratulations, you've gone from spec to simulation in minutes

@@ -21,7 +21,7 @@ console = Console(theme=custom_theme)
 
 def print_header():
     """Prints the application header."""
-    console.print(Rule("[bold magenta]Cirkitly: The AI Test Generation Copilot[/bold magenta]", style="magenta"))
+    console.print(Rule("[bold magenta]Spec2Test: AI-Powered Verilog Verification Copilot[/bold magenta]", style="magenta"))
     console.print()
 
 def print_step(message: str):
@@ -32,27 +32,32 @@ def print_success(message: str):
     """Prints a success message panel."""
     console.print(Panel(message, title="[success]Success[/success]", border_style="success", expand=False, padding=(1, 2)))
 
-def print_code(code: str, language: str = "c"):
+def print_code(code: str, language: str, title: str):
     """Prints syntax-highlighted code in a panel."""
     syntax = Syntax(code, language, theme="monokai", line_numbers=True)
-    panel = Panel(syntax, title=f"[info]{language.capitalize()} Code Review[/info]", border_style="info")
+    panel = Panel(syntax, title=f"[info]{title}[/info]", border_style="info")
     console.print(panel)
 
 def print_plan(plan_text: str):
     """Prints a markdown-formatted plan in a panel."""
     markdown = Markdown(plan_text)
-    panel = Panel(markdown, title="[info]Proposed Test Plan[/info]", border_style="info", expand=False, padding=(1,2))
+    panel = Panel(markdown, title="[info]Proposed Generation Plan[/info]", border_style="info", expand=False, padding=(1,2))
     console.print(panel)
 
+def print_critique(critique_text: str):
+    """Prints a markdown-formatted critique in a panel."""
+    markdown = Markdown(critique_text)
+    panel = Panel(markdown, title="[warning]AI Self-Critique[/warning]", border_style="warning", expand=False, padding=(1,2))
+    console.print(panel)
 
 def prompt_for_input(prompt_text: str, default: str) -> str:
     """Prompts the user for text input."""
-    return Prompt.ask(f"[prompt] {prompt_text}", default=default, console=console)
+    return Prompt.ask(f"[prompt]{prompt_text}[/prompt]", default=default, console=console)
 
 def prompt_for_choice(prompt_text: str, choices: list) -> int:
     """Prompts the user to choose from a list of options."""
     return IntPrompt.ask(
-        f"[prompt] {prompt_text}",
+        f"[prompt]{prompt_text}[/prompt]",
         choices=[str(i) for i in range(1, len(choices) + 1)],
         show_choices=False,
         console=console
@@ -61,7 +66,6 @@ def prompt_for_choice(prompt_text: str, choices: list) -> int:
 def prompt_for_confirmation(prompt_text: str, default: bool = True) -> bool:
     """Prompts the user for a yes/no confirmation."""
     return Confirm.ask(f"[prompt]{prompt_text}[/prompt]", default=default, console=console)
-
 
 def status(message: str):
     """Returns a status spinner context manager."""
