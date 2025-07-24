@@ -1,6 +1,4 @@
-# ======================
-# File: nodes.py
-# ======================
+# spec2test/nodes.py
 
 import os
 import glob
@@ -14,7 +12,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 from pocketflow import Node, AsyncNode, BaseNode
 from utils.call_llm import call_llm
 from utils.get_embedding import get_embedding
-from utils.prompt_loader import load_prompt  # <-- NEW IMPORT
+from utils.prompt_loader import load_prompt
 from tui import (
     console, print_step, prompt_for_input, prompt_for_choice, 
     status, prompt_for_confirmation, print_plan, print_code, print_critique
@@ -98,44 +96,20 @@ class PlanningAgentNode(Node):
     def post(self, shared, _, exec_res):
         shared["execution_plan"] = exec_res
 
-# --- Phase 2: Parallel Generation ---
-class CodeGenerationAgentNode(AsyncNode):
+# --- Phase 2: Sequential Generation ---
+class RTLGeneratorNode(AsyncNode):
     async def prep_async(self, shared):
-        task_type = self.params['task']
-        prep_data = {
-            "task": task_type,
+        return {
             "spec_content": shared["target_spec_content"],
             "knowledge": shared.get("retrieved_knowledge", "None"),
-            "rtl_code": shared.get("generated_artifacts", {}).get("generate_rtl", "RTL not yet generated."),
-            "placeholder": "" # For prompts that need an empty placeholder
+            "placeholder": ""
         }
-        return prep_data
     
     async def exec_async(self, inputs):
-        task = inputs["task"]
-        prompt_file_map = {
-            'generate_rtl': 'code_generator/generate_rtl.md',
-            'generate_testbench': 'code_generator/generate_testbench.md'
-        }
-        
-        prompt_template = load_prompt(prompt_file_map.get(task, ""))
-        if not prompt_template:
-            raise ValueError(f"No prompt template found for task: {task}")
-            
-        # For testbench, we also need to load the iverilog rules
-        if task == 'generate_testbench':
-            inputs['iverilog_rules'] = load_prompt('rules/iverilog_compatibility.md')
-            # Ensure RTL is available for the testbench prompt
-            if inputs['rtl_code'] == "RTL not yet generated.":
-                 # This is a fallback, ideally the flow ensures RTL is generated first
-                 # or that testbench generation depends on it.
-                 # For now, we'll try to find it in the shared state if another parallel task finished.
-                 # A more robust solution would involve explicit dependencies in the flow.
-                 pass
-
+        print_step("Generating Verilog RTL...")
+        prompt_template = load_prompt('code_generator/generate_rtl.md')
         final_prompt = prompt_template.format(**inputs)
-
-        print_step(f"Executing async task: {task}...")
+        
         loop = asyncio.get_running_loop()
         code = await loop.run_in_executor(None, call_llm, final_prompt, False, 4096)
         
@@ -144,13 +118,42 @@ class CodeGenerationAgentNode(AsyncNode):
             if code.lstrip().startswith(('verilog', 'systemverilog')):
                 code = code[code.find('\n'):].strip()
         
-        return {task: code}
+        return code
 
     async def post_async(self, shared, _, exec_res):
-        # This post method now runs for each parallel task.
-        # We need a way to merge results. We will do this in the parallel flow's post method.
-        # So we just return the result to be collected.
-        return exec_res
+        shared["generated_artifacts"] = {"generate_rtl": exec_res}
+
+class TestbenchGeneratorNode(AsyncNode):
+    async def prep_async(self, shared):
+        return {
+            "spec_content": shared["target_spec_content"],
+            "iverilog_rules": load_prompt('rules/iverilog_compatibility.md'),
+            "rtl_code": shared.get("generated_artifacts", {}).get("generate_rtl", "RTL not yet generated."),
+            "placeholder": ""
+        }
+    
+    async def exec_async(self, inputs):
+        if inputs['rtl_code'] == "RTL not yet generated.":
+            console.print("[danger]Cannot generate testbench: RTL code is missing.[/danger]")
+            return "# ERROR: RTL code was not provided to testbench generator."
+
+        print_step("Generating SystemVerilog Testbench...")
+        prompt_template = load_prompt('code_generator/generate_testbench.md')
+        final_prompt = prompt_template.format(**inputs)
+
+        loop = asyncio.get_running_loop()
+        code = await loop.run_in_executor(None, call_llm, final_prompt, False, 4096)
+        
+        if "```" in code:
+            code = code.split("```", 2)[1]
+            if code.lstrip().startswith(('verilog', 'systemverilog')):
+                code = code[code.find('\n'):].strip()
+        
+        return code
+
+    async def post_async(self, shared, _, exec_res):
+        shared["generated_artifacts"]["generate_testbench"] = exec_res
+
 
 # --- Phase 3: Validation & Self-Critique ---
 class ValidationNode(Node):
@@ -325,7 +328,8 @@ class SimulationScriptGeneratorNode(Node):
         tb_file = os.path.basename(next((p for p in file_paths if p.endswith("_tb.v")), None))
         if not rtl_file or not tb_file: return "Could not identify RTL and Testbench files."
         
-        script_content = f"#!/bin/bash\niverilog -o sim_output.vvp {rtl_file} {tb_file}\nvvp sim_output.vvp\n"
+        # Add the -g2005-sv flag to enable SystemVerilog features during compilation.
+        script_content = f"#!/bin/bash\niverilog -o sim_output.vvp -g2005-sv {rtl_file} {tb_file}\nvvp sim_output.vvp\n"
         script_path = os.path.join(output_dir, "run_sim.sh")
         
         with open(script_path, 'w', encoding='utf-8') as f: f.write(script_content)

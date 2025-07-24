@@ -1,3 +1,4 @@
+
 # Icarus Verilog (iverilog) Compatibility Rules
 
 Here are critical rules for writing SystemVerilog that is compatible with the `iverilog` compiler.
@@ -12,3 +13,7 @@ Here are critical rules for writing SystemVerilog that is compatible with the `i
 
 3.  **VCD Dumping:**
     *   Use the standard `$dumpfile("filename.vcd");` and `$dumpvars(0, module_instance);` system tasks to create waveform dumps.
+
+4.  **Array Declarations:**
+    *   DO NOT declare arrays of vectors or test vectors inside an `initial` or `always` block (e.g., `initial begin reg [7:0] my_vecs[0:3]; ...`).
+    *   You MUST declare all such arrays at the **module level**, outside of any procedural blocks.

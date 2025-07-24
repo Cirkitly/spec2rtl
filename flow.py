@@ -1,13 +1,13 @@
 # spec2test/flow.py
 
-import asyncio
-from pocketflow import AsyncFlow, AsyncParallelBatchFlow
+from pocketflow import AsyncFlow
 from nodes import (
     KnowledgeIndexNode,
     SpecSelectionNode,
     KnowledgeRetrievalNode,
     PlanningAgentNode,
-    CodeGenerationAgentNode,
+    RTLGeneratorNode,
+    TestbenchGeneratorNode,
     ValidationNode,
     DebugAndRefineNode,
     CritiqueAgentNode,
@@ -16,59 +16,48 @@ from nodes import (
     SimulationScriptGeneratorNode
 )
 
-# --- START OF FIX ---
-# The sub-flow must be async to match its async start node.
-generation_agent_node = CodeGenerationAgentNode()
-generation_sub_flow = AsyncFlow(start=generation_agent_node)
-# --- END OF FIX ---
-
-class GenerationParallelFlow(AsyncParallelBatchFlow):
-    """
-    This flow now correctly inherits from AsyncParallelBatchFlow and relies on its
-    base implementation to gather results from the async sub-flow.
-    """
-    async def prep_async(self, shared):
-        return shared.get("execution_plan", [])
-
-    async def post_async(self, shared, _, exec_res_list):
-        # The exec_res_list now correctly contains the dictionaries from each parallel run.
-        artifacts = {}
-        for res_dict in exec_res_list:
-            if isinstance(res_dict, dict):
-                artifacts.update(res_dict)
-        shared["generated_artifacts"] = artifacts
-        return None
-
 def create_spec2test_flow():
+    # Phase 1: Planning
     indexer = KnowledgeIndexNode()
     selector = SpecSelectionNode()
     retriever = KnowledgeRetrievalNode()
     planner = PlanningAgentNode()
-    # The parallel generator now starts the ASYNC sub-flow
-    parallel_generator = GenerationParallelFlow(start=generation_sub_flow)
+
+    # Phase 2: Sequential Generation
+    rtl_generator = RTLGeneratorNode()
+    tb_generator = TestbenchGeneratorNode()
+
+    # Phase 3: Validation & Refinement
     validator = ValidationNode()
     critiquer = CritiqueAgentNode()
     debugger = DebugAndRefineNode()
+
+    # Phase 4: Finalization
     approver = HumanApprovalNode()
     writer = FileParserAndWriterNode()
     script_gen = SimulationScriptGeneratorNode()
 
-    # The connections remain the same, but the underlying execution is now correct.
-    (indexer >> selector >> retriever >> planner)
-    planner >> parallel_generator
-    parallel_generator >> validator
+    # Define the flow graph:
+    # Planning -> RTL Gen -> TB Gen -> Validation Loop -> Approval -> File Write
+    (
+        indexer >> selector >> retriever >> planner >>
+        rtl_generator >> tb_generator >> validator
+    )
     
+    # Validation and self-correction loop
     validator - "success" >> critiquer
     validator - "failure" >> debugger
     
     critiquer - "success" >> approver
     critiquer - "failure" >> debugger
     
-    debugger >> validator
+    debugger >> validator # Loop back to validation
     debugger - "max_attempts_reached" >> approver
     
+    # Finalization
     (approver >> writer >> script_gen)
 
+    # The entire flow is asynchronous because it contains async nodes
     return AsyncFlow(start=indexer)
 
 spec2test_flow = create_spec2test_flow()
