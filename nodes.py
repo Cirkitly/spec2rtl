@@ -12,6 +12,8 @@ import yaml
 #Sci-kit import
 from sklearn.metrics.pairwise import cosine_similarity
 
+# Pocketflow imports are to inherit the classes defined and execute them for the llm prompt generation here
+
 from pocketflow import Node, AsyncNode, BaseNode
 
 #Utils import
@@ -23,6 +25,15 @@ from tui import (
     status, prompt_for_confirmation, print_plan, print_code, print_critique
 )
 
+"""
+    * The classes below are defined in order to process information related to the specification and then the 
+    * data is to be stored related to them. Once the values are returned as per the class definition, 
+    * then they are called in the file flow.py
+    
+    * These classes inherit from Node class in PocketFlow . 
+    * Node defines three methods which are executed by it in terms of whichever class inherits from it
+    * It basically acts like a Plugin
+"""
 # --- Phase 1: Planning ---
 class KnowledgeIndexNode(Node):
     def exec(self, _):
