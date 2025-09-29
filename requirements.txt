@@ -14,5 +14,6 @@ openai
 numpy
 git+https://github.com/cirkitly/PocketFlow.git
 mkdocs-material
+mkdocs
 
 
