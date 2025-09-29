@@ -3,6 +3,7 @@
 # Virtual Environment
 env/
 venv/
+.venv/
 envCirkitly/
 *.pyenv
 
