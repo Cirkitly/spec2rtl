@@ -1,3 +1,16 @@
+## ⚠️ Project Status: Discontinued
+
+> **This project is discontinued and no longer under active development.**
+
+The last meaningful development cycle concluded in mid-2025. Rather than continuing work on this CLI-based implementation, development has moved to a **new successor project** with a cleaner architecture and a stronger focus on **plugin-based, hardware-centric AI workflows**.
+
+👉 **New repository:**
+**[github.com/Cirkitly/spec2rtl-plugin/](https://github.com/Cirkitly/spec2rtl-plugin/)**
+
+No new features, fixes, or releases are planned here.
+
+---
+
 # Spec2RTL: AI-Powered Hardware Design & Verification Copilot
 
 Spec2RTL is an autonomous AI assistant that transforms high-level hardware specifications into verified, ready-to-use Verilog RTL and a corresponding SystemVerilog testbench. It leverages a multi-agent workflow, a self-correction loop, and a custom knowledge base to automate the most tedious parts of the hardware design lifecycle.
@@ -167,5 +180,6 @@ cd output/uart_spec
 # Run the simulation script
 ./run_sim.sh
 ```
+
 
 You should see the `iverilog` compilation and the testbench execution results printed to your console. Congratulations, you've gone from spec to simulation in minutes
